@@ -1,0 +1,19 @@
+{
+  "config_version": 3,
+  "platform": [
+    {
+      "id": "qq",
+      "type": "aiocqhttp",
+      "enable": true,
+      "ws_reverse_host": "0.0.0.0",
+      "ws_reverse_port": 6199,
+      "ws_reverse_token": "CHANGE_ME_ONEBOT_ACCESS_TOKEN"
+    }
+  ],
+  "platform_settings": {
+    "enable_id_white_list": true,
+    "id_whitelist": []
+  },
+  "admins_id": [],
+  "wake_prefix": ["/"]
+}

@@ -1,0 +1,44 @@
+name: ${COMPOSE_PROJECT_NAME:-qqbot-napcat-astrbot}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  astrbot:
+    image: ${ASTRBOT_IMAGE:-soulter/astrbot:v4.28.2}
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      ASTRBOT_DASHBOARD_INITIAL_PASSWORD: ${ASTRBOT_DASHBOARD_INITIAL_PASSWORD:?Run python3 scripts/init.py first}
+    ports:
+      - "127.0.0.1:${ASTRBOT_WEBUI_PORT:-6185}:6185"
+    expose:
+      - "6199"
+    volumes:
+      - ./data/astrbot:/AstrBot/data
+      - ./plugins/astrbot_plugin_starter:/AstrBot/data/plugins/astrbot_plugin_starter:ro
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+
+  napcat:
+    image: ${NAPCAT_IMAGE:-mlikiowa/napcat-docker:latest}
+    restart: unless-stopped
+    depends_on:
+      - astrbot
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      NAPCAT_UID: ${NAPCAT_UID:-1000}
+      NAPCAT_GID: ${NAPCAT_GID:-1000}
+      WEBUI_TOKEN: ${NAPCAT_WEBUI_TOKEN:?Run python3 scripts/init.py first}
+    ports:
+      - "127.0.0.1:${NAPCAT_WEBUI_PORT:-6099}:6099"
+    volumes:
+      - ./data/napcat/config:/app/napcat/config
+      - ./data/napcat/qq:/app/.config/QQ
+      # Both services need the same absolute path for local media files.
+      - ./data/astrbot:/AstrBot/data
+    logging: *logging

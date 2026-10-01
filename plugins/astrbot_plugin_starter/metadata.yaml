@@ -1,0 +1,6 @@
+name: astrbot_plugin_starter
+display_name: QQ Bot Starter
+desc: 验证 NapCat 与 AstrBot 的消息链路，提供 ping 和 bot_info 指令。
+version: v0.1.0
+author: ZureTz
+repo: https://github.com/ZureTz/qqbot-napcat-astrbot
