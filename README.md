@@ -20,6 +20,8 @@ docker compose up -d
 
 初始化会创建 `.env` 和 `data/`，生成三个独立的随机凭据，并将相同的 OneBot 令牌写入两端配置。重复运行会保留已有凭据和配置。不要先复制 `.env.example`：直接运行初始化脚本即可。
 
+管理面板默认监听所有 IPv4 接口。从其他设备访问时，将下面链接中的 `127.0.0.1` 替换为部署机器的局域网 IP 或 Tailscale IP，无需 SSH 转发。登录密码和 Token 验证仍然生效。
+
 ### 1. 登录 QQ
 
 打开 [NapCat WebUI](http://127.0.0.1:6099/webui)，使用本地 `.env` 中的 `NAPCAT_WEBUI_TOKEN` 登录，再用手机 QQ 扫码登录机器人账号。
@@ -85,7 +87,7 @@ NapCat 首次登录会从 `data/napcat/config/onebot11.json` 创建账号专属�
 | 项目 | 当前情况 / 待办 |
 | --- | --- |
 | 消息和扩展结构 | NapCat → OneBot → AstrBot → 插件 / 模型，配置与插件源码分离 |
-| 持久化与凭据 | 已有数据挂载、随机凭据、Git 忽略和本机管理端口绑定 |
+| 持久化与凭据 | 已有数据挂载、随机凭据和 Git 忽略；管理面板支持局域网与 Tailscale 直连 |
 | 访问范围 | 管理员和会话白名单需手动配置；空白名单不限制访问，开放群聊前必须核对 |
 | LLM 入口 | 已提供面板配置和 `/ask`；需填写真实提供商并验证 |
 | 自动检查 | Compose 校验、Python 语法和隔离单元测试；不替代真实 AstrBot / QQ 联调 |
@@ -163,20 +165,25 @@ docker compose ps
 
 如果 `.env` 修改了镜像标签，请同步替换上述镜像名。给 Docker CLI 设置 `HTTP_PROXY` 不会自动让 Docker 守护进程通过代理拉取镜像；这里使用 skopeo 导入，避免为配置代理而重启运行其他服务的 Docker。
 
-在自己的电脑建立 SSH 转发（替换为实际 SSH 用户与地址，也可使用 SSH 配置别名）：
+部署后可从局域网或 Tailscale 直接访问：
+
+- AstrBot：`http://树莓派IP:6185`
+- NapCat：`http://树莓派IP:6099/webui`
+
+初始凭据位于树莓派部署目录的 `.env`，QQ 扫码和模型配置仍需按前面的步骤完成。若希望面板仅允许本机访问，将 `.env` 中的 `WEBUI_BIND_HOST` 改为 `127.0.0.1`，运行 `docker compose up -d --pull never` 后，在自己的电脑建立 SSH 转发：
 
 ```bash
 ssh -N -L 6185:127.0.0.1:6185 -L 6099:127.0.0.1:6099 user@raspberrypi
 ```
 
-保持连接后，访问本机 `http://127.0.0.1:6185` 和 `http://127.0.0.1:6099/webui`。初始凭据位于树莓派部署目录的 `.env`，QQ 扫码和模型配置仍需按前面的步骤完成。
+保持 SSH 连接后，也可访问本机 `http://127.0.0.1:6185` 和 `http://127.0.0.1:6099/webui`。
 
 更新源码使用 `git -c http.proxy=http://127.0.0.1:7890 pull --ff-only`；更新镜像时重新执行对应 skopeo 命令。此流程只代理下载；若模型 API 也需要代理，应另外配置 AstrBot 到 mihomo 的容器可达地址，容器内的 `127.0.0.1:7890` 不是宿主机代理。
 
 ## 配置与升级
 
 - AstrBot 固定为 `soulter/astrbot:v4.28.2`；NapCat 默认使用 `mlikiowa/napcat-docker:latest`。NapCat 为滚动标签，需要固定环境时可在 `.env` 中改用已验证的镜像 digest。
-- 两个管理端口只绑定本机 `127.0.0.1`。OneBot 6199 仅用于容器间通信，不映射到宿主机。服务器部署可通过 SSH 转发访问面板：`ssh -L 6185:127.0.0.1:6185 -L 6099:127.0.0.1:6099 user@server`。
+- 两个管理端口默认通过 `WEBUI_BIND_HOST=0.0.0.0` 监听所有 IPv4 接口，可使用局域网或 Tailscale IP 直连。可在 `.env` 中指定某个本机 IP，或设置 `127.0.0.1` 仅限本机访问。修改后执行 `docker compose up -d --pull never` 使端口绑定生效。OneBot 6199 仍仅用于容器间通信，不映射到宿主机。
 - `.env` 中的 OneBot 令牌仅用于首次生成配置。修改它不会覆盖已经运行过的配置；轮换时要同步修改 AstrBot 的 Token 和 NapCat 当前账号的 Token。NapCat WebUI Token 和 AstrBot 初始密码也只在首次初始化时生效，后续在各自面板中修改。
 - 模板 JSON 的修改仅影响新的初始化。现有实例请在 WebUI 中配置，或停机后编辑 `data/` 下的实际文件。
 - 两个容器共享 `/AstrBot/data`，用于图片、音频等本地媒体路径；不要去掉 NapCat 中这一挂载。

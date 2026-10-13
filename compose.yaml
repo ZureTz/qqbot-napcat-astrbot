@@ -16,7 +16,7 @@ services:
       # Optional: enter $LLM_API_KEY in the provider's API Key field.
       LLM_API_KEY: ${LLM_API_KEY:-}
     ports:
-      - "127.0.0.1:${ASTRBOT_WEBUI_PORT:-6185}:6185"
+      - "${WEBUI_BIND_HOST:-0.0.0.0}:${ASTRBOT_WEBUI_PORT:-6185}:6185"
     expose:
       - "6199"
     volumes:
@@ -37,7 +37,7 @@ services:
       NAPCAT_GID: ${NAPCAT_GID:-1000}
       WEBUI_TOKEN: ${NAPCAT_WEBUI_TOKEN:?Run python3 scripts/init.py first}
     ports:
-      - "127.0.0.1:${NAPCAT_WEBUI_PORT:-6099}:6099"
+      - "${WEBUI_BIND_HOST:-0.0.0.0}:${NAPCAT_WEBUI_PORT:-6099}:6099"
     volumes:
       - ./data/napcat/config:/app/napcat/config
       - ./data/napcat/qq:/app/.config/QQ
