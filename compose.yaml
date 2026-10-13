@@ -13,6 +13,8 @@ services:
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       ASTRBOT_DASHBOARD_INITIAL_PASSWORD: ${ASTRBOT_DASHBOARD_INITIAL_PASSWORD:?Run python3 scripts/init.py first}
+      # Optional: enter $LLM_API_KEY in the provider's API Key field.
+      LLM_API_KEY: ${LLM_API_KEY:-}
     ports:
       - "127.0.0.1:${ASTRBOT_WEBUI_PORT:-6185}:6185"
     expose:

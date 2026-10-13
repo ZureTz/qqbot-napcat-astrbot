@@ -47,6 +47,55 @@ NapCat 首次登录会从 `data/napcat/config/onebot11.json` 创建账号专属�
 
 这两个指令不需要大模型 API Key。确认消息链路可用后，再到 AstrBot 的模型服务配置中填写供应商、API 地址、API Key 和模型，并选择默认聊天模型。人设、上下文和知识库也在面板中配置。
 
+## LLM 接入入口
+
+配置入口是 [AstrBot WebUI](http://127.0.0.1:6185) 的「模型提供商 → 对话」。如果修改了 `ASTRBOT_WEBUI_PORT`，请使用对应端口。
+
+1. 新增提供商：兼容 OpenAI 协议的服务选择 `OpenAI Compatible`，其他服务选择对应适配器。
+2. 填写厂商提供的 **API Base URL**、**API Key**。Base URL 填接口根地址（例如厂商文档要求的 `/v1`），不要填写完整的 `/chat/completions` 路径。
+3. 保存并获取模型，添加需要的模型并启用；也可以手动填写厂商给出的模型 ID。点击「测试模型」验证。
+4. 在「配置文件 → 当前配置 → AI → 模型」选择默认对话模型并保存。多个会话使用不同配置时，在各自配置中选择。
+5. 在「插件 → QQ Bot Starter → 配置」打开 `llm_enabled`。默认 `admin_only=true`，先用已加入 AstrBot 管理员列表的 QQ 账号测试。`provider_id` 留空会使用当前会话的聊天模型，也可从选择器固定一个模型。
+6. QQ 发送 `/ask 用三句话介绍你自己`。普通聊天、多轮上下文、人设和知识库请通过 AstrBot 原生聊天入口使用。
+
+`/ask` 是单轮纯文本开发入口：不读取和保存聊天历史，也不自动加载人设、知识库或调用工具；系统提示词在插件中配置。每个插件实例最多同时处理 2 次请求，默认 60 秒超时，输入限制 4000 字符，输出超过 3500 字符会截断。并发上限不等于每日额度或频率限制。插件开关和管理员限制仅作用于 `/ask`，不会关闭 AstrBot 原生 AI。
+
+已有部署拉取本次代码后，在面板重载插件或运行 `docker compose restart astrbot`，即可看到新指令与配置项。
+
+### 密钥入口（可选环境变量）
+
+可以直接在模型提供商页面填写密钥。若希望集中存放在本地 `.env`，添加 `LLM_API_KEY=你的密钥`，然后在模型提供商的 API Key 一栏填写字面量 `$LLM_API_KEY`。Compose 已将该变量传入 AstrBot。修改 `.env` 后运行 `docker compose up -d astrbot` 以重建容器；单纯 `restart` 不会更新容器环境变量。
+
+`LLM_API_KEY` 只提供密钥，不会自动创建提供商或选择模型；现有 `.env` 不会被初始化脚本补写。不要把密钥写进插件源码或示例文件，也不要公开包含密钥的 Compose 配置输出。
+
+### 本地模型地址
+
+模型运行在宿主机时，AstrBot 容器里的 `127.0.0.1` 指向容器自身。Docker Desktop / OrbStack 环境可尝试用 `host.docker.internal` 替换模型地址的主机部分，并保留实际端口和 API 路径；需要确认模型服务允许容器访问。Linux Docker Engine 可按部署环境为 AstrBot 添加 `extra_hosts: ["host.docker.internal:host-gateway"]`。模型若在同一个 Compose 网络，使用该服务名和容器端口。
+
+### 在代码中扩展
+
+入口位于 `plugins/astrbot_plugin_starter/main.py` 的 `ask()`：先通过 `context.get_current_chat_provider_id(event.unified_msg_origin)` 选择模型，再调用 `context.llm_generate(chat_provider_id=..., prompt=..., system_prompt=...)`。业务逻辑可在调用前处理问题、调用后处理 `response.completion_text`，无需另装模型 SDK。
+
+接口已对照 [AstrBot v4.28.2 源码](https://github.com/AstrBotDevs/AstrBot/blob/v4.28.2/astrbot/core/star/context.py) 核对。更多配置见[官方模型接入文档](https://docs.astrbot.app/providers/start.html)。
+
+## 完善程度与上线前检查
+
+当前是可扩展的单机部署起点，尚不能视为已经完成端到端验证的生产部署。
+
+| 项目 | 当前情况 / 待办 |
+| --- | --- |
+| 消息和扩展结构 | NapCat → OneBot → AstrBot → 插件 / 模型，配置与插件源码分离 |
+| 持久化与凭据 | 已有数据挂载、随机凭据、Git 忽略和本机管理端口绑定 |
+| 访问范围 | 管理员和会话白名单需手动配置；空白名单不限制访问，开放群聊前必须核对 |
+| LLM 入口 | 已提供面板配置和 `/ask`；需填写真实提供商并验证 |
+| 自动检查 | Compose 校验、Python 语法和隔离单元测试；不替代真实 AstrBot / QQ 联调 |
+| 运行状态 | `restart` 仅处理进程退出；尚无健康检查或异常告警，`depends_on` 不保证 AstrBot 已就绪 |
+| 版本复现 | AstrBot 固定版本；NapCat 的 `latest` 会变化，长期运行建议固定已验证 digest |
+| 备份恢复 | 有手动备份步骤；尚无定时备份或恢复演练 |
+| 用量管理 | `/ask` 有并发与长度限制；公共群还需配置频率、每日配额或供应商预算限制 |
+
+建议验收顺序：容器启动 → QQ 登录 → 管理员与白名单 → `/ping` → 面板测试模型 → `/ask` → 重启后确认配置保留。媒体消息、群聊权限和恢复流程需在实际账号上另行验证。
+
 ## 目录结构
 
 ```text
@@ -58,7 +107,8 @@ plugins/astrbot_plugin_starter/       # 可提交到 Git 的插件源码
 data/astrbot/                        # AstrBot 配置、数据库和运行数据（忽略）
 data/napcat/config/                  # NapCat 配置（忽略）
 data/napcat/qq/                      # QQ 登录会话（忽略）
-.github/workflows/check.yml          # Compose 和 Python 语法检查
+.github/workflows/check.yml          # Compose、Python 语法和单元测试
+tests/                              # 无需安装 AstrBot 的隔离单元测试
 ```
 
 ## 开发插件
@@ -76,7 +126,8 @@ docker compose restart astrbot
 ## 常用命令
 
 ```bash
-make check                      # 无需启动 Docker 引擎的静态检查
+make check                      # 无需启动 Docker 引擎的校验和单元测试
+make test                       # 仅运行 Python 单元测试
 make up                         # 初始化并启动
 make status                     # 查看容器状态
 make logs                       # 查看日志；可能含登录信息，不要公开上传

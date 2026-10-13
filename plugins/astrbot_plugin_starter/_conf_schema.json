@@ -1,0 +1,33 @@
+{
+  "llm_enabled": {
+    "description": "启用 /ask 模型调用",
+    "type": "bool",
+    "default": false,
+    "hint": "先配置模型提供商、管理员和会话白名单，再开启。"
+  },
+  "admin_only": {
+    "description": "仅允许 AstrBot 管理员使用 /ask",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭前请配置会话白名单；此开关仅限制本插件的 /ask。"
+  },
+  "provider_id": {
+    "description": "聊天模型",
+    "type": "string",
+    "default": "",
+    "_special": "select_provider",
+    "hint": "留空使用当前会话的聊天模型；API Key 在模型提供商页面配置。"
+  },
+  "timeout_seconds": {
+    "description": "模型调用超时（秒）",
+    "type": "int",
+    "default": 60,
+    "hint": "有效范围 1–300 秒，超出范围会自动限制。"
+  },
+  "system_prompt": {
+    "description": "/ask 系统提示词",
+    "type": "text",
+    "default": "你是一个中文 QQ 助手。请准确、简洁地回答问题。",
+    "hint": "单轮文本调用，不自动加载 AstrBot 的人设、历史记录、知识库或工具。"
+  }
+}
