@@ -170,6 +170,8 @@ docker compose ps
 - AstrBot：`http://树莓派IP:6185`
 - NapCat：`http://树莓派IP:6099/webui`
 
+若主机启用了 UFW 的 Docker 转发过滤，还需要用 `ufw route allow` 放行局域网 / Tailscale 接口到本项目容器子网的 TCP `6099,6185` 端口；只开放主机 INPUT 规则可能不够。可用 `docker network inspect qqbot-napcat-astrbot_default` 查看容器子网。如果重新创建网络后子网变化，需要同步更新对应规则。
+
 初始凭据位于树莓派部署目录的 `.env`，QQ 扫码和模型配置仍需按前面的步骤完成。若希望面板仅允许本机访问，将 `.env` 中的 `WEBUI_BIND_HOST` 改为 `127.0.0.1`，运行 `docker compose up -d --pull never` 后，在自己的电脑建立 SSH 转发：
 
 ```bash
