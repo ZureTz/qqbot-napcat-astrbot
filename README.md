@@ -137,6 +137,42 @@ docker compose restart astrbot # 重载应用
 
 没有 `make` 时可直接运行对应的 `python3 scripts/init.py` 和 `docker compose` 命令。
 
+## 树莓派部署：使用本机 mihomo 代理
+
+适用于 64 位 ARM Linux。先确认 mihomo 的 HTTP / mixed 端口，下面以 `127.0.0.1:7890` 为例。只为下载命令指定代理，无需设置系统全局代理。
+
+```bash
+git -c http.proxy=http://127.0.0.1:7890 clone https://github.com/ZureTz/qqbot-napcat-astrbot.git
+cd qqbot-napcat-astrbot
+python3 scripts/init.py
+sudo apt-get install -y --no-install-recommends skopeo
+
+# skopeo 使用当前主机架构，通过代理下载离线归档，再交给 Docker 导入。
+# 归档方式也兼容 Debian 12 的旧版 skopeo 与新版 Docker。
+mkdir -p work
+env HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 NO_PROXY=localhost,127.0.0.1 \
+  skopeo copy --retry-times 3 docker://soulter/astrbot:v4.28.2 docker-archive:work/astrbot.tar:soulter/astrbot:v4.28.2
+docker load -i work/astrbot.tar && rm work/astrbot.tar
+env HTTP_PROXY=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890 NO_PROXY=localhost,127.0.0.1 \
+  skopeo copy --retry-times 3 docker://mlikiowa/napcat-docker:latest docker-archive:work/napcat.tar:mlikiowa/napcat-docker:latest
+docker load -i work/napcat.tar && rm work/napcat.tar
+
+docker compose up -d --pull never
+docker compose ps
+```
+
+如果 `.env` 修改了镜像标签，请同步替换上述镜像名。给 Docker CLI 设置 `HTTP_PROXY` 不会自动让 Docker 守护进程通过代理拉取镜像；这里使用 skopeo 导入，避免为配置代理而重启运行其他服务的 Docker。
+
+在自己的电脑建立 SSH 转发（替换为实际 SSH 用户与地址，也可使用 SSH 配置别名）：
+
+```bash
+ssh -N -L 6185:127.0.0.1:6185 -L 6099:127.0.0.1:6099 user@raspberrypi
+```
+
+保持连接后，访问本机 `http://127.0.0.1:6185` 和 `http://127.0.0.1:6099/webui`。初始凭据位于树莓派部署目录的 `.env`，QQ 扫码和模型配置仍需按前面的步骤完成。
+
+更新源码使用 `git -c http.proxy=http://127.0.0.1:7890 pull --ff-only`；更新镜像时重新执行对应 skopeo 命令。此流程只代理下载；若模型 API 也需要代理，应另外配置 AstrBot 到 mihomo 的容器可达地址，容器内的 `127.0.0.1:7890` 不是宿主机代理。
+
 ## 配置与升级
 
 - AstrBot 固定为 `soulter/astrbot:v4.28.2`；NapCat 默认使用 `mlikiowa/napcat-docker:latest`。NapCat 为滚动标签，需要固定环境时可在 `.env` 中改用已验证的镜像 digest。
